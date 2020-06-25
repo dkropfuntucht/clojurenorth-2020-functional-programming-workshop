@@ -59,13 +59,25 @@
              :frame-num   (inc (:frame first-pass))
              :local-score (:current first-pass)}))))
 
-(defn look-forward
-  [rolls frame-num step]
-  (let [target-idx (+ (dec frame-num) step)]
-    (if (> target-idx (dec (count rolls)))
-      {:type :not-there
-       :local-score 0}
-      (nth rolls target-idx))))
+(defn score-forward
+  [rolls frame-num type]
+  (let [target-idx frame-num
+        frame      (if (> target-idx (dec (count rolls)))
+                     {:type :not-there
+                      :rolls [0]
+                      :local-score 0}
+                     (nth rolls target-idx))]
+    (condp = type
+      :spare
+      (get-in frame [:rolls 0] 0)
+
+      :strike
+      (if (= (:type frame) :strike)
+        (+ 10 (get-in rolls [(inc target-idx) :rolls 0] 0))
+        (:local-score frame))
+
+      :else
+      0)))
 
 (defn score
   [rolls]
@@ -77,9 +89,7 @@
                          (= type :spare)
                          (+ total-score
                             local-score
-                            (get-in (look-forward rolls frame-num 1)
-                                    [:rolls 0]))
-
+                            (score-forward rolls frame-num :spare))
 
                          (= type :bonus-roll)
                          total-score
@@ -87,10 +97,7 @@
                          (= type :strike)
                          (+ total-score
                             local-score
-                            (get-in (look-forward rolls frame-num 1)
-                                    [:rolls 0] 0)
-                            (get-in (look-forward rolls frame-num 1)
-                                    [:rolls 1] 0))
+                            (score-forward rolls frame-num :strike))
 
                          :else
                          (+ total-score local-score))})
