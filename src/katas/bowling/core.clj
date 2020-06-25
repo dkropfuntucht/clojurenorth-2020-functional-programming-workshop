@@ -1,5 +1,7 @@
 (ns katas.bowling.core)
 
+;; - presumably, we could write a routine to go from one of these
+;; back to a vector of rolls
 (defn characterize-frames
   [rolls]
   (let [first-pass (reduce
@@ -7,19 +9,23 @@
                       (cond (= roll 10)
                             {:current        0
                              :frame          (inc frame)
-                             :frames         (conj frames {:rolls       1
-                                                           :type        :strike
-                                                           :frame-num   (inc frame)
-                                                           :local-score 10})
+                             :frames         (conj frames
+                                                   {:roll-count  1
+                                                    :rolls       [10]
+                                                    :type        :strike
+                                                    :frame-num   (inc frame)
+                                                    :local-score 10})
                              :in-frame-count 0}
 
                             (= (+ roll current) 10)
                             {:current       0
                              :frame         (inc frame)
-                             :frames        (conj frames {:rolls       2
-                                                          :type        :spare
-                                                          :frame-num   (inc frame)
-                                                          :local-score 10})
+                             :frames        (conj frames
+                                                  {:roll-count  2
+                                                   :rolls       [current roll]
+                                                   :type        :spare
+                                                   :frame-num   (inc frame)
+                                                   :local-score 10})
                              :in-frame-count 0}
 
                             (= in-frame-count 0)
@@ -31,10 +37,13 @@
                             :else
                             {:current        0
                              :frame          (inc frame)
-                             :frames         (conj frames {:rolls       2
-                                                           :type        :whatever-you-call-this
-                                                           :frame-num   (inc frame)
-                                                           :local-score (+ roll current)})
+                             :frames         (conj frames
+                                                   {:roll-count  2
+                                                    :type        :just-a-frame
+                                                    :rolls       [current roll]
+                                                    :frame-num   (inc frame)
+                                                    :local-score
+                                                    (+ roll current)})
                              :in-frame-count 0}))
                     {:current        0
                      :in-frame-count 0
@@ -44,7 +53,8 @@
     (if (zero? (:current first-pass))
       (:frames first-pass)
       (conj (:frames first-pass)
-            {:rolls       1
+            {:roll-count  1
+             :rolls       [(:current first-pass)]
              :type        :bonus-roll
              :frame-num   (inc (:frame first-pass))
              :local-score (:current first-pass)}))))
@@ -61,20 +71,29 @@
   [rolls]
   (reduce
    (fn [{:keys [total-score]} {:keys [type frame-num local-score] :as roll}]
-     {:total-score (condp = type
+     {:total-score (cond (> frame-num 10)
+                         total-score
 
-                     :spare
-                     (+ total-score
-                        local-score
-                        (:local-score (look-forward rolls frame-num 1)))
+                         (= type :spare)
+                         (+ total-score
+                            local-score
+                            (get-in (look-forward rolls frame-num 1)
+                                    [:rolls 0]))
 
-                     :strike
-                     (+ total-score
-                        local-score
-                        (:local-score (look-forward rolls frame-num 1))
-                        (:local-score (look-forward rolls frame-num 2)))
 
-                     (+ total-score local-score))})
+                         (= type :bonus-roll)
+                         total-score
+
+                         (= type :strike)
+                         (+ total-score
+                            local-score
+                            (get-in (look-forward rolls frame-num 1)
+                                    [:rolls 0] 0)
+                            (get-in (look-forward rolls frame-num 1)
+                                    [:rolls 1] 0))
+
+                         :else
+                         (+ total-score local-score))})
    {:total-score 0}
    rolls))
 
