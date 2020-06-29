@@ -1,7 +1,8 @@
 (ns katas.monty-hall.core)
 
 (defn make-doors []
-  (shuffle [::goat ::goat ::car]))
+  {::doors
+   (shuffle [::goat ::goat ::car])})
 
 (defn remove-door
   [doors idx]
@@ -9,16 +10,21 @@
                (subvec doors (inc idx)))))
 
 (defn pick-one
-  [doors]
+  [{:keys [::doors]}]
   (let [pick-idx (rand-int (count doors))]
     {::pick  (get doors pick-idx)
      ::doors (remove-door doors pick-idx)}))
 
-(defn pick-subsequent
-  [result]
-  (if (= (::pick result) ::car)
-    result
-    (pick-one (::doors result))))
+(defn monty-shows-a-goat
+  [{:keys [::doors] :as result}]
+  (condp = (set doors)
+    #{::goat}
+    (assoc result
+           ::doors [::goat])
+
+    #{::car ::goat}
+    (assoc result
+           ::doors [::car])))
 
 (defn count-cars
   [result]
@@ -29,15 +35,18 @@
 
 (defn simulate []
   (let [attempts       1000
+        ;; - if you stay, Monty doesn't need to show his goat
         stay-results   (count-cars
                         (for [_ (range 0 attempts)]
                           (-> (make-doors)
                               pick-one)))
+        ;; - make your pick, Monty shows the goat, wisely switch
         switch-results (count-cars
                         (for [_ (range 0 attempts)]
                           (-> (make-doors)
                               pick-one
-                              pick-subsequent)))]
+                              monty-shows-a-goat
+                              pick-one)))]
     {:stay   {false switch-results
               true  stay-results}
      :switch {true  switch-results
